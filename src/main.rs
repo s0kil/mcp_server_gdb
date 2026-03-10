@@ -59,19 +59,8 @@ impl FromStr for TransportType {
     }
 }
 
-pub static TRANSPORT: LazyLock<Mutex<Option<Arc<Box<dyn Transport>>>>> =
+pub static TRANSPORT: LazyLock<Mutex<Option<Arc<dyn Transport>>>> =
     LazyLock::new(|| Mutex::new(None));
-
-fn resolve_home(path: &str) -> Option<PathBuf> {
-    if path.starts_with("~/") {
-        if let Ok(home) = env::var("HOME") {
-            return Some(Path::new(&home).join(&path[2..]));
-        }
-        None
-    } else {
-        Some(PathBuf::from(path))
-    }
-}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -144,6 +133,7 @@ pub struct MyScrollState {
 }
 
 #[derive(Default)]
+#[allow(dead_code)]
 struct App {
     gdb: GDBManager,
     /// -32 bit mode
@@ -184,14 +174,6 @@ struct App {
 }
 
 impl App {
-    // Parse a "file filepath" command and save
-    fn save_filepath(&mut self, val: &str) {
-        let filepath: Vec<&str> = val.split_whitespace().collect();
-        let filepath = resolve_home(filepath[1]).expect("Failed to resolve home directory");
-        // debug!("filepath: {filepath:?}");
-        self.filepath = Some(filepath);
-    }
-
     pub async fn find_first_heap(&self) -> Option<MemoryMapping> {
         self.memory_map.as_ref()?.iter().find(|a| a.is_heap()).cloned()
     }
@@ -298,9 +280,8 @@ async fn main() -> Result<(), AppError> {
 
     let transport = match args.transport {
         TransportType::Stdio => {
-            let transport = Arc::new(
-                Box::new(ServerStdioTransport::new(server_protocol)) as Box<dyn Transport>
-            );
+            let transport =
+                Arc::new(ServerStdioTransport::new(server_protocol)) as Arc<dyn Transport>;
             {
                 let mut transport_guard = TRANSPORT.lock().await;
                 *transport_guard = Some(transport.clone());
@@ -308,11 +289,11 @@ async fn main() -> Result<(), AppError> {
             transport
         }
         TransportType::Sse => {
-            let transport = Arc::new(Box::new(ServerSseTransport::new(
+            let transport = Arc::new(ServerSseTransport::new(
                 config.server_ip,
                 config.server_port,
                 server_protocol,
-            )) as Box<dyn Transport>);
+            )) as Arc<dyn Transport>;
             {
                 let mut transport_guard = TRANSPORT.lock().await;
                 *transport_guard = Some(transport.clone());
@@ -623,4 +604,50 @@ fn register_tools(builder: ServerProtocolBuilder) -> ServerProtocolBuilder {
         .register_tool(tools::GetRegistersTool::tool(), tools::GetRegistersTool::call())
         .register_tool(tools::GetRegisterNamesTool::tool(), tools::GetRegisterNamesTool::call())
         .register_tool(tools::ReadMemoryTool::tool(), tools::ReadMemoryTool::call())
+        // Chunk 1: Expression eval, variable objects, CLI passthrough
+        .register_tool(tools::EvaluateExpressionTool::tool(), tools::EvaluateExpressionTool::call())
+        .register_tool(tools::VarCreateTool::tool(), tools::VarCreateTool::call())
+        .register_tool(tools::VarDeleteTool::tool(), tools::VarDeleteTool::call())
+        .register_tool(tools::VarListChildrenTool::tool(), tools::VarListChildrenTool::call())
+        .register_tool(tools::CliCommandTool::tool(), tools::CliCommandTool::call())
+        // Chunk 2: Execution control extensions
+        .register_tool(tools::FinishExecutionTool::tool(), tools::FinishExecutionTool::call())
+        .register_tool(tools::UntilExecutionTool::tool(), tools::UntilExecutionTool::call())
+        .register_tool(tools::ReturnExecutionTool::tool(), tools::ReturnExecutionTool::call())
+        .register_tool(tools::ReverseContinueTool::tool(), tools::ReverseContinueTool::call())
+        .register_tool(tools::ReverseStepTool::tool(), tools::ReverseStepTool::call())
+        .register_tool(tools::ReverseNextTool::tool(), tools::ReverseNextTool::call())
+        .register_tool(tools::ReverseFinishTool::tool(), tools::ReverseFinishTool::call())
+        // Chunk 3: Breakpoint enhancements
+        .register_tool(tools::SetBreakpointConditionalTool::tool(), tools::SetBreakpointConditionalTool::call())
+        .register_tool(tools::SetBreakpointTemporaryTool::tool(), tools::SetBreakpointTemporaryTool::call())
+        .register_tool(tools::EnableBreakpointTool::tool(), tools::EnableBreakpointTool::call())
+        .register_tool(tools::DisableBreakpointTool::tool(), tools::DisableBreakpointTool::call())
+        .register_tool(tools::SetWatchpointTool::tool(), tools::SetWatchpointTool::call())
+        // Chunk 4: Disassembly and memory
+        .register_tool(tools::DisassembleFileTool::tool(), tools::DisassembleFileTool::call())
+        .register_tool(tools::DisassembleAddressTool::tool(), tools::DisassembleAddressTool::call())
+        .register_tool(tools::WriteMemoryTool::tool(), tools::WriteMemoryTool::call())
+        .register_tool(tools::GetChangedRegistersTool::tool(), tools::GetChangedRegistersTool::call())
+        // Chunk 5: Thread and frame management
+        .register_tool(tools::GetThreadInfoTool::tool(), tools::GetThreadInfoTool::call())
+        .register_tool(tools::SelectFrameTool::tool(), tools::SelectFrameTool::call())
+        .register_tool(tools::GetFrameInfoTool::tool(), tools::GetFrameInfoTool::call())
+        .register_tool(tools::GetStackDepthTool::tool(), tools::GetStackDepthTool::call())
+        .register_tool(tools::ListThreadGroupsTool::tool(), tools::ListThreadGroupsTool::call())
+        // Chunk 6: Source and file management
+        .register_tool(tools::LoadFileTool::tool(), tools::LoadFileTool::call())
+        .register_tool(tools::LoadSymbolFileTool::tool(), tools::LoadSymbolFileTool::call())
+        .register_tool(tools::ListSourceFilesTool::tool(), tools::ListSourceFilesTool::call())
+        .register_tool(tools::GetCurrentSourceFileTool::tool(), tools::GetCurrentSourceFileTool::call())
+        // Chunk 7: Remote debugging and process control
+        .register_tool(tools::TargetSelectTool::tool(), tools::TargetSelectTool::call())
+        .register_tool(tools::TargetDetachTool::tool(), tools::TargetDetachTool::call())
+        .register_tool(tools::SendSignalTool::tool(), tools::SendSignalTool::call())
+        .register_tool(tools::GdbSetTool::tool(), tools::GdbSetTool::call())
+        .register_tool(tools::GdbShowTool::tool(), tools::GdbShowTool::call())
+        // Chunk 8: Remaining tools
+        .register_tool(tools::SetExecArgumentsTool::tool(), tools::SetExecArgumentsTool::call())
+        .register_tool(tools::GetWorkingDirectoryTool::tool(), tools::GetWorkingDirectoryTool::call())
+        .register_tool(tools::IsSessionActiveTool::tool(), tools::IsSessionActiveTool::call())
 }

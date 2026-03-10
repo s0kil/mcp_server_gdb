@@ -1,5 +1,5 @@
 use core::fmt;
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::fmt::Display;
 use std::ops::{Add, Sub};
 use std::path::{Path, PathBuf};
@@ -43,20 +43,6 @@ pub enum GDBSessionStatus {
     Terminated,
 }
 
-/// GDB command request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GDBCommandRequest {
-    /// GDB/MI command
-    pub command: String,
-}
-
-/// Create session request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateSessionRequest {
-    /// Executable file path (optional)
-    pub executable_path: Option<String>,
-}
-
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SrcPosition {
@@ -77,10 +63,20 @@ impl<T: FromStr<Err = std::num::ParseIntError> + Display + Clone + std::fmt::Low
     fn from(s: String) -> Self {
         let s = if s.starts_with("0x") { &s[2..] } else { &s };
         match u128::from_str_radix(s, 16) {
-            Ok(val) => {
-                Address(T::from_str(&val.to_string()).unwrap_or_else(|_| T::from_str("0").unwrap()))
-            }
-            Err(_) => Address(T::from_str(s).unwrap_or_else(|_| T::from_str("0").unwrap())),
+            Ok(val) => match T::from_str(&val.to_string()) {
+                Ok(v) => Address(v),
+                Err(_) => {
+                    tracing::warn!("Address overflow converting '{}', defaulting to 0", val);
+                    Address(T::from_str("0").expect("0 is always valid"))
+                }
+            },
+            Err(_) => match T::from_str(s) {
+                Ok(v) => Address(v),
+                Err(_) => {
+                    tracing::warn!("Invalid address '{}', defaulting to 0", s);
+                    Address(T::from_str("0").expect("0 is always valid"))
+                }
+            },
         }
     }
 }
@@ -120,10 +116,7 @@ pub type Address128 = Address<u128>;
 
 impl Address128 {
     pub fn new(low: Address64, high: Address64) -> Self {
-        let mut val = Address::<u128>(high.0 as u128);
-        val.0 = val.0 << 64;
-        val.0 += low.0 as u128;
-        val
+        Address((high.0 as u128) << 64 | low.0 as u128)
     }
 }
 
@@ -152,45 +145,6 @@ pub struct BreakPoint {
     pub r#type: String,
     #[serde(rename = "disp")]
     pub display: String,
-}
-
-pub struct BreakPointSet {
-    map: HashMap<BreakPointNumber, BreakPoint>,
-    pub last_change: std::time::Instant,
-}
-
-impl Default for BreakPointSet {
-    fn default() -> Self {
-        Self { map: HashMap::new(), last_change: std::time::Instant::now() }
-    }
-}
-
-impl BreakPointSet {
-    fn notify_change(&mut self) {
-        self.last_change = std::time::Instant::now();
-    }
-
-    pub fn update_breakpoint(&mut self, new_bp: BreakPoint) {
-        let _ = self.map.insert(new_bp.number, new_bp);
-        //debug_assert!(res.is_some(), "Modified non-existent breakpoint");
-        self.notify_change();
-    }
-
-    pub fn remove_breakpoint(&mut self, bp_num: BreakPointNumber) {
-        self.map.remove(&bp_num);
-        if bp_num.minor.is_none() {
-            //TODO: ensure removal of child breakpoints
-        }
-        self.notify_change();
-    }
-}
-
-impl std::ops::Deref for BreakPointSet {
-    type Target = HashMap<BreakPointNumber, BreakPoint>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.map
-    }
 }
 
 /// Stack frame information
@@ -243,7 +197,11 @@ impl FromStr for PrintValue {
 
 impl Display for PrintValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self)
+        match self {
+            PrintValue::NoValues => write!(f, "0"),
+            PrintValue::AllValues => write!(f, "1"),
+            PrintValue::SimpleValues => write!(f, "2"),
+        }
     }
 }
 
@@ -260,6 +218,7 @@ pub struct Variable {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum RegisterRaw {
     U32(Address32),
     U64(Address64),
@@ -355,6 +314,7 @@ pub struct TrackedRegister {
     pub resolve: ResolveSymbol,
 }
 
+#[allow(dead_code)]
 impl TrackedRegister {
     pub fn new(register: Option<Register>, resolve: ResolveSymbol) -> Self {
         Self { register, resolve }
@@ -424,6 +384,7 @@ impl MemoryMapping {
     }
 }
 
+#[allow(dead_code)]
 impl MemoryMapping {
     /// Parse from `MEMORY_MAP_START_STR_NEW`
     fn from_str_new(line: &str) -> Result<Self, String> {
@@ -478,11 +439,13 @@ impl MemoryMapping {
 }
 
 /// Parse from `MEMORY_MAP_START_STR_NEW`
+#[allow(dead_code)]
 pub fn parse_memory_mappings_new(input: &str) -> Vec<MemoryMapping> {
     input.lines().skip(1).filter_map(|line| MemoryMapping::from_str_new(line).ok()).collect()
 }
 
 /// Parse from `MEMORY_MAP_START_STR_OLD`
+#[allow(dead_code)]
 pub fn parse_memory_mappings_old(input: &str) -> Vec<MemoryMapping> {
     input.lines().skip(1).filter_map(|line| MemoryMapping::from_str_old(line).ok()).collect()
 }
@@ -494,6 +457,7 @@ pub struct ResolveSymbol {
     pub final_assembly: String,
 }
 
+#[allow(dead_code)]
 impl ResolveSymbol {
     /// Attempts to insert a `u64` value and prevents repeated patterns
     ///

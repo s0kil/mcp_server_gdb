@@ -1,9 +1,9 @@
-use anyhow;
 use thiserror::Error;
 use tokio::task::JoinError;
 
 /// Application error types
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum AppError {
     #[error("GDB error: {0}")]
     GDBError(String),
@@ -25,6 +25,12 @@ pub enum AppError {
 
     #[error("Resource not found: {0}")]
     NotFound(String),
+
+    #[error("Program has exited. {0}")]
+    ProgramExited(String),
+
+    #[error("Program is not running. {0}")]
+    ProgramNotRunning(String),
 
     #[error("Invalid argument: {0}")]
     InvalidArgument(String),

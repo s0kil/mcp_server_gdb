@@ -1,12 +1,12 @@
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Flex, Layout, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation};
 
 use super::{BLUE, DARK_GRAY, GREEN, ORANGE, SCROLL_CONTROL_TEXT, YELLOW};
-use crate::models::{RegisterRaw, TrackedRegister};
-use crate::{App, Endian};
+use crate::App;
+use crate::models::RegisterRaw;
 
 pub const HEXDUMP_WIDTH: usize = 16;
 
@@ -80,53 +80,6 @@ fn to_hexdump_str<'a>(
     lines
 }
 
-fn deref_bytes_to_registers(
-    endian: &Option<Endian>,
-    chunk: &[u8],
-    thirty: bool,
-    ref_spans: &mut Vec<Span<'_>>,
-    registers: &Vec<TrackedRegister>,
-) {
-    let windows = if thirty { 4 } else { 8 };
-    for w in chunk.windows(windows) {
-        let bytes_val = if thirty {
-            let val = if endian.unwrap() == Endian::Big {
-                // TODO: try_into()
-                u32::from_be_bytes([w[0], w[1], w[2], w[3]])
-            } else {
-                u32::from_le_bytes([w[0], w[1], w[2], w[3]])
-            };
-
-            val as u64
-        } else {
-            if endian.unwrap() == Endian::Big {
-                u64::from_be_bytes([w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]])
-            } else {
-                u64::from_le_bytes([w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]])
-            }
-        };
-
-        for r in registers.iter() {
-            if let Some(reg) = &r.register {
-                if let (Some(name), Some(reg_value)) = (&reg.name, &reg.value) {
-                    if let RegisterRaw::U64(val) = reg_value {
-                        if val.0 != 0 {
-                            // Find registers that are pointing to the value at a byte offset
-                            if bytes_val == val.0 {
-                                ref_spans.push(Span::raw(format!(
-                                    "${}(0x{:02x?}) ",
-                                    name.clone(),
-                                    val.0
-                                )));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 fn color(byte: u8) -> Color {
     if byte == 0x00 {
         DARK_GRAY
@@ -139,14 +92,6 @@ fn color(byte: u8) -> Color {
     } else {
         YELLOW
     }
-}
-
-fn popup_area(area: Rect, percent_x: u16) -> Rect {
-    let vertical = Layout::vertical([Constraint::Length(3)]).flex(Flex::Center);
-    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
-    let [area] = vertical.areas(area);
-    let [area] = horizontal.areas(area);
-    area
 }
 
 fn block(pos: &str) -> Block<'_> {

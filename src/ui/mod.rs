@@ -37,9 +37,6 @@ const ASM_COLOR: Color = ORANGE;
 
 const SAVED_OUTPUT: usize = 10;
 
-/// Amount of stack addresses we save/display
-pub const SAVED_STACK: u16 = 14;
-
 pub const SCROLL_CONTROL_TEXT: &str = "(up(k), down(j), 50 up(K), 50 down(J), top(g), bottom(G))";
 
 pub fn ui<'a>(f: &mut Frame<'a>, app: &mut App) {
