@@ -1,92 +1,84 @@
 # MCP Server GDB
 
-A GDB/MI protocol server based on the MCP protocol, providing remote application debugging capabilities with AI assistants.
+MCP server that wraps GDB/MI, enabling AI assistants to debug programs through 51 tools.
 
-## Features
+## Install
 
-- Create and manage GDB debug sessions
-- Set and manage breakpoints
-- View stack information and variables
-- Control program execution (run, pause, step, etc.)
-- Support concurrent multi-session debugging
-- A built-in TUI to inspect agent behaviors so that you can improve your prompt (WIP)
+```bash
+cargo install --git https://github.com/s0kil/mcp_server_gdb
+```
 
-## Installation
+Or build from source:
 
-### Pre-built Binaries
-Find the binaries in the release page, choose one per your working platform, then you can run it directly.
-
-### Build From Source
-Clone the repository and build it by cargo
 ```bash
 cargo build --release
-cargo run
 ```
 
-### Using Nix
-If you have Nix installed, you can run the project without cloning:
+With Nix:
 
-#### Run locally (after cloning)
 ```bash
-nix run .
-```
-
-#### Run remotely from GitHub
-```bash
-nix run "git+https://github.com/pansila/mcp_server_gdb.git" -- --help
-
-```
-
-#### Development environment
-To enter a development shell with all dependencies:
-```bash
-nix develop
+nix run "git+https://github.com/pansila/mcp_server_gdb.git"
 ```
 
 ## Usage
 
-1. Just run it directly: `./mcp-server-gdb`
-2. The server supports two transport modes:
-   - Stdio (default): Standard input/output transport
-   - SSE: Server-Sent Events transport, default at `http://127.0.0.1:8080`
+```bash
+mcp-server-gdb                    # stdio transport (default)
+mcp-server-gdb --transport sse    # SSE transport on 127.0.0.1:8080
+```
 
-## Configuration
+### Environment Variables
 
-You can adjust server configuration by modifying the `src/config.rs` file or by environment variables:
+| Variable | Default | Description |
+|-|-|-|
+| `SERVER_IP` | `127.0.0.1` | SSE bind address |
+| `SERVER_PORT` | `8080` | SSE port |
+| `GDB_COMMAND_TIMEOUT` | `10` | Command timeout (seconds) |
 
-- Server IP Address
-- Server port
-- GDB command timeout time (in seconds)
-
-## Supported MCP Tools
+## Tools (51)
 
 ### Session Management
+`create_session` `get_session` `get_all_sessions` `close_session` `is_session_active`
 
-- `create_session` - Create a new GDB debugging session
-- `get_session` - Get specific session information
-- `get_all_sessions` - Get all sessions
-- `close_session` - Close session
+### Execution Control
+`start_debugging` `stop_debugging` `continue_execution` `step_execution` `next_execution` `finish_execution` `until_execution` `return_execution`
 
-### Debug Control
+### Reverse Debugging
+`reverse_continue` `reverse_step` `reverse_next` `reverse_finish`
 
-- `start_debugging` - Start debugging
-- `stop_debugging` - Stop debugging
-- `continue_execution` - Continue execution
-- `step_execution` - Step into next line
-- `next_execution` - Step over next line
+### Breakpoints & Watchpoints
+`get_breakpoints` `set_breakpoint` `set_breakpoint_conditional` `set_breakpoint_temporary` `delete_breakpoint` `enable_breakpoint` `disable_breakpoint` `set_watchpoint`
 
-### Breakpoint Management
+### Inspection
+`get_stack_frames` `get_local_variables` `get_registers` `get_register_names` `get_changed_registers` `read_memory` `get_stack_depth` `get_frame_info`
 
-- `get_breakpoints` - Get breakpoint list
-- `set_breakpoint` - Set breakpoint
-- `delete_breakpoint` - Delete breakpoint
+### Expression & Variables
+`evaluate_expression` `var_create` `var_delete` `var_list_children`
 
-### Debug Information
+### Disassembly & Memory
+`disassemble_file` `disassemble_address` `write_memory`
 
-- `get_stack_frames` - Get stack frame information
-- `get_local_variables` - Get local variables
-- `get_registers` - Get registers
-- `read_memory` - Read memory contents
+### Thread & Frame Management
+`get_thread_info` `select_frame` `list_thread_groups`
+
+### Source & File Management
+`load_file` `load_symbol_file` `list_source_files` `get_current_source_file`
+
+### Remote Debugging & Process Control
+`target_select` `target_detach` `send_signal` `gdb_set` `gdb_show` `set_exec_arguments` `get_working_directory`
+
+### CLI Passthrough
+`cli_exec` — run any GDB console command directly
+
+## Testing
+
+Requires `gcc` and `gdb` installed.
+
+```bash
+cargo test
+```
+
+42 integration tests cover all tool categories.
 
 ## License
 
