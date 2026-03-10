@@ -4,7 +4,7 @@ use anyhow::{Result, bail};
 use clap::{Parser, ValueEnum};
 use mcp_core::client::{Client, ClientBuilder};
 use mcp_core::transport::{ClientSseTransport, ClientSseTransportBuilder, ClientStdioTransport};
-use mcp_core::types::{ClientCapabilities, Implementation, ToolResponseContent};
+use mcp_core::types::ToolResponseContent;
 use serde_json::{Value, json};
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
@@ -89,12 +89,7 @@ async fn main() -> Result<()> {
             client.open().await?;
 
             // Initialize client
-            client
-                .initialize(
-                    Implementation { name: "gdb-client".to_string(), version: "1.0".to_string() },
-                    ClientCapabilities::default(),
-                )
-                .await?;
+            client.initialize().await?;
 
             Box::new(client)
         }
@@ -125,7 +120,8 @@ async fn main() -> Result<()> {
     // Extract session ID from response
     let content = session_response.first().unwrap();
     let session_id;
-    if let ToolResponseContent::Text { text } = content {
+    if let ToolResponseContent::Text(text_content) = content {
+        let text = &text_content.text;
         session_id = text.split_once(": ").unwrap().1.split('"').next().unwrap();
     } else {
         bail!("Unable to parse session ID");

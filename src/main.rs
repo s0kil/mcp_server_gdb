@@ -21,7 +21,7 @@ use futures::StreamExt;
 use gdb::GDBManager;
 use mcp_core::server::{Server, ServerProtocolBuilder};
 use mcp_core::transport::{ServerSseTransport, ServerStdioTransport, Transport};
-use mcp_core::types::ServerCapabilities;
+use mcp_core::types::{ProtocolVersion, ServerCapabilities, ToolCapabilities};
 use models::{ASM, BT, MemoryMapping, MemoryType, ResolveSymbol, TrackedRegister};
 use ratatui::Terminal;
 use ratatui::crossterm::event::{DisableMouseCapture, Event, KeyCode};
@@ -31,7 +31,7 @@ use ratatui::crossterm::terminal::{
 };
 use ratatui::prelude::Backend;
 use ratatui::widgets::ScrollbarState;
-use serde_json::json;
+
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tools::GDB_MANAGER;
 use tracing::{debug, error, info, warn};
@@ -284,14 +284,15 @@ async fn main() -> Result<(), AppError> {
 
     tools::init_gdb_manager();
 
-    let server_protocol =
-        Server::builder("MCP Server GDB".to_string(), env!("CARGO_PKG_VERSION").to_string())
-            .capabilities(ServerCapabilities {
-                tools: Some(json!({
-                    "listChanged": false,
-                })),
-                ..Default::default()
-            });
+    let server_protocol = Server::builder(
+        "MCP Server GDB".to_string(),
+        env!("CARGO_PKG_VERSION").to_string(),
+        ProtocolVersion::V2025_03_26,
+    )
+    .set_capabilities(ServerCapabilities {
+        tools: Some(ToolCapabilities::default()),
+        ..Default::default()
+    });
 
     let server_protocol = register_tools(server_protocol).build();
 
@@ -495,7 +496,7 @@ async fn run_app<B: Backend + Send + 'static>(
                     }
                     KeyCode::Char('H') if app.mode == Mode::OnlyHexdump => {
                         if let Some(find_heap) = app.find_first_heap().await {
-                            let memory = GDB_MANAGER
+                            let _memory = GDB_MANAGER
                                 .read_memory(
                                     "",
                                     Some(find_heap.start_address as isize),
@@ -512,7 +513,7 @@ async fn run_app<B: Backend + Send + 'static>(
                     }
                     KeyCode::Char('T') if app.mode == Mode::OnlyHexdump => {
                         if let Some(find_stack) = app.find_first_stack().await {
-                            let memory = GDB_MANAGER
+                            let _memory = GDB_MANAGER
                                 .read_memory(
                                     "",
                                     Some(find_stack.start_address as isize),

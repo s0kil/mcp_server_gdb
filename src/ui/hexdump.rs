@@ -149,7 +149,7 @@ fn popup_area(area: Rect, percent_x: u16) -> Rect {
     area
 }
 
-fn block(pos: &str) -> Block {
+fn block(pos: &str) -> Block<'_> {
     let block = Block::default().borders(Borders::ALL).title(
         format!("Hexdump{pos} {SCROLL_CONTROL_TEXT}, Save(S), HEAP(H), STACK(T))").fg(ORANGE),
     );

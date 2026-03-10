@@ -2,13 +2,11 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 
-use anyhow::Result;
 use mcp_core::tool_text_content;
 use mcp_core::types::ToolResponseContent;
-use mcp_core_macros::tool;
+use mcp_core_macros::{tool, tool_param};
 
 use crate::gdb::GDBManager;
-use crate::mi::GDB;
 
 pub static GDB_MANAGER: LazyLock<Arc<GDBManager>> =
     LazyLock::new(|| Arc::new(GDBManager::default()));
@@ -20,40 +18,54 @@ pub fn init_gdb_manager() {
 #[tool(
     name = "create_session",
     description = "Create a new GDB debugging session with optional parameters,\
-                   returns a session ID (UUID) if successful",
-    params(
-        program = "if provided, path to the executable to debug",
-        nh = "if provided, do not read ~/.gdbinit file",
-        nx = "if provided, do not read any .gdbinit files in any directory",
-        quiet = "if provided, do not print version number on startup",
-        cd = "if provided, change current directory to DIR",
-        bps = "if provided, set serial port baud rate used for remote debugging",
-        symbol_file = "if provided, read symbols from SYMFILE",
-        core_file = "if provided, analyze the core dump COREFILE",
-        proc_id = "if provided, attach to running process PID",
-        command = "if provided, execute GDB commands from FILE",
-        source_dir = "if provided, search for source files in DIR",
-        args = "if provided, arguments to be passed to the inferior program",
-        tty = "if provided, use TTY for input/output by the program being debugged",
-        gdb_path = "if provided, path to the GDB executable",
-    )
+                   returns a session ID (UUID) if successful"
 )]
 pub async fn create_session_tool(
-    program: Option<PathBuf>,
-    nh: Option<bool>,
-    nx: Option<bool>,
-    quiet: Option<bool>,
-    cd: Option<PathBuf>,
-    bps: Option<u32>,
-    symbol_file: Option<PathBuf>,
-    core_file: Option<PathBuf>,
-    proc_id: Option<u32>,
-    command: Option<PathBuf>,
-    source_dir: Option<PathBuf>,
-    args: Option<Vec<OsString>>,
-    tty: Option<PathBuf>,
-    gdb_path: Option<PathBuf>,
-) -> Result<ToolResponseContent> {
+    program: tool_param!(
+        Option<PathBuf>,
+        description = "if provided, path to the executable to debug"
+    ),
+    nh: tool_param!(Option<bool>, description = "if provided, do not read ~/.gdbinit file"),
+    nx: tool_param!(
+        Option<bool>,
+        description = "if provided, do not read any .gdbinit files in any directory"
+    ),
+    quiet: tool_param!(
+        Option<bool>,
+        description = "if provided, do not print version number on startup"
+    ),
+    cd: tool_param!(Option<PathBuf>, description = "if provided, change current directory to DIR"),
+    bps: tool_param!(
+        Option<u32>,
+        description = "if provided, set serial port baud rate used for remote debugging"
+    ),
+    symbol_file: tool_param!(
+        Option<PathBuf>,
+        description = "if provided, read symbols from SYMFILE"
+    ),
+    core_file: tool_param!(
+        Option<PathBuf>,
+        description = "if provided, analyze the core dump COREFILE"
+    ),
+    proc_id: tool_param!(Option<u32>, description = "if provided, attach to running process PID"),
+    command: tool_param!(
+        Option<PathBuf>,
+        description = "if provided, execute GDB commands from FILE"
+    ),
+    source_dir: tool_param!(
+        Option<PathBuf>,
+        description = "if provided, search for source files in DIR"
+    ),
+    args: tool_param!(
+        Option<Vec<OsString>>,
+        description = "if provided, arguments to be passed to the inferior program"
+    ),
+    tty: tool_param!(
+        Option<PathBuf>,
+        description = "if provided, use TTY for input/output by the program being debugged"
+    ),
+    gdb_path: tool_param!(Option<PathBuf>, description = "if provided, path to the GDB executable"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let session = GDB_MANAGER
         .create_session(
             program,
@@ -75,150 +87,111 @@ pub async fn create_session_tool(
     Ok(tool_text_content!(format!("Created GDB session: {}", session)))
 }
 
-#[tool(
-    name = "get_session",
-    description = "Get a GDB debugging session by ID",
-    params(session_id = "The ID of the GDB session")
-)]
-pub async fn get_session_tool(session_id: String) -> Result<ToolResponseContent> {
+#[tool(name = "get_session", description = "Get a GDB debugging session by ID")]
+pub async fn get_session_tool(
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let session = GDB_MANAGER.get_session(&session_id).await?;
     Ok(tool_text_content!(format!("Session: {}", serde_json::to_string(&session)?)))
 }
 
-#[tool(name = "get_all_sessions", description = "Get all GDB debugging sessions", params())]
-pub async fn get_all_sessions_tool() -> Result<ToolResponseContent> {
+#[tool(name = "get_all_sessions", description = "Get all GDB debugging sessions")]
+pub async fn get_all_sessions_tool() -> Result<ToolResponseContent, anyhow::Error> {
     let sessions = GDB_MANAGER.get_all_sessions().await?;
     Ok(tool_text_content!(format!("Sessions: {}", serde_json::to_string(&sessions)?)))
 }
 
-#[tool(
-    name = "close_session",
-    description = "Close a GDB debugging session",
-    params(session_id = "The ID of the GDB session")
-)]
-pub async fn close_session_tool(session_id: String) -> Result<ToolResponseContent> {
+#[tool(name = "close_session", description = "Close a GDB debugging session")]
+pub async fn close_session_tool(
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     GDB_MANAGER.close_session(&session_id).await?;
     Ok(tool_text_content!("Closed GDB session".to_string()))
 }
 
-#[tool(
-    name = "start_debugging",
-    description = "Start debugging in a session",
-    params(session_id = "The ID of the GDB session")
-)]
-pub async fn start_debugging_tool(session_id: String) -> Result<ToolResponseContent> {
+#[tool(name = "start_debugging", description = "Start debugging in a session")]
+pub async fn start_debugging_tool(
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let ret = GDB_MANAGER.start_debugging(&session_id).await?;
     Ok(tool_text_content!(format!("Started debugging: {}", ret)))
 }
 
-#[tool(
-    name = "stop_debugging",
-    description = "Stop debugging in a session",
-    params(session_id = "The ID of the GDB session")
-)]
-pub async fn stop_debugging_tool(session_id: String) -> Result<ToolResponseContent> {
+#[tool(name = "stop_debugging", description = "Stop debugging in a session")]
+pub async fn stop_debugging_tool(
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let ret = GDB_MANAGER.stop_debugging(&session_id).await?;
     Ok(tool_text_content!(format!("Stopped debugging: {}", ret)))
 }
 
-#[tool(
-    name = "get_breakpoints",
-    description = "Get all breakpoints in the current GDB session",
-    params(session_id = "The ID of the GDB session")
-)]
-pub async fn get_breakpoints_tool(session_id: String) -> Result<ToolResponseContent> {
+#[tool(name = "get_breakpoints", description = "Get all breakpoints in the current GDB session")]
+pub async fn get_breakpoints_tool(
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let breakpoints = GDB_MANAGER.get_breakpoints(&session_id).await?;
     Ok(tool_text_content!(format!("Breakpoints: {}", serde_json::to_string(&breakpoints)?)))
 }
 
-#[tool(
-    name = "set_breakpoint",
-    description = "Set a breakpoint in the code",
-    params(
-        session_id = "The ID of the GDB session",
-        file = "Source file path",
-        line = "Line number"
-    )
-)]
+#[tool(name = "set_breakpoint", description = "Set a breakpoint in the code")]
 pub async fn set_breakpoint_tool(
-    session_id: String,
-    file: String,
-    line: usize,
-) -> Result<ToolResponseContent> {
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+    file: tool_param!(String, description = "Source file path"),
+    line: tool_param!(usize, description = "Line number"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let breakpoint = GDB_MANAGER.set_breakpoint(&session_id, &PathBuf::from(file), line).await?;
     Ok(tool_text_content!(format!("Set breakpoint: {}", serde_json::to_string(&breakpoint)?)))
 }
 
-#[tool(
-    name = "delete_breakpoint",
-    description = "Delete one or more breakpoints in the code",
-    params(
-        session_id = "The ID of the GDB session",
-        breakpoints = "The array of the breakpoint numbers to delete"
-    )
-)]
+#[tool(name = "delete_breakpoint", description = "Delete one or more breakpoints in the code")]
 pub async fn delete_breakpoint_tool(
-    session_id: String,
-    breakpoints: Vec<String>,
-) -> Result<ToolResponseContent> {
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+    breakpoints: tool_param!(
+        Vec<String>,
+        description = "The array of the breakpoint numbers to delete"
+    ),
+) -> Result<ToolResponseContent, anyhow::Error> {
     GDB_MANAGER.delete_breakpoint(&session_id, breakpoints).await?;
     Ok(tool_text_content!("Breakpoints deleted".to_string()))
 }
 
-#[tool(
-    name = "get_stack_frames",
-    description = "Get stack frames in the current GDB session",
-    params(session_id = "The ID of the GDB session")
-)]
-pub async fn get_stack_frames_tool(session_id: String) -> Result<ToolResponseContent> {
+#[tool(name = "get_stack_frames", description = "Get stack frames in the current GDB session")]
+pub async fn get_stack_frames_tool(
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let frames = GDB_MANAGER.get_stack_frames(&session_id).await?;
     Ok(tool_text_content!(format!("Stack frames: {}", serde_json::to_string(&frames)?)))
 }
 
 #[tool(
     name = "get_local_variables",
-    description = "Get local variables in the current stack frame",
-    params(
-        session_id = "The ID of the GDB session",
-        frame_id = "The ID of the stack frame, defaults to 0, the topest frame"
-    )
+    description = "Get local variables in the current stack frame"
 )]
 pub async fn get_local_variables_tool(
-    session_id: String,
-    frame_id: Option<usize>,
-) -> Result<ToolResponseContent> {
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+    frame_id: tool_param!(
+        Option<usize>,
+        description = "The ID of the stack frame, defaults to 0, the topest frame"
+    ),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let variables = GDB_MANAGER.get_local_variables(&session_id, frame_id).await?;
     Ok(tool_text_content!(format!("Local variables: {}", serde_json::to_string(&variables)?)))
 }
 
-#[tool(
-    name = "get_registers",
-    description = "Get registers in the current GDB session",
-    params(
-        session_id = "The ID of the GDB session",
-        reg_list = "The array of the registers to get",
-    )
-)]
+#[tool(name = "get_registers", description = "Get registers in the current GDB session")]
 pub async fn get_registers_tool(
-    session_id: String,
-    reg_list: Option<Vec<String>>,
-) -> Result<ToolResponseContent> {
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+    reg_list: tool_param!(Option<Vec<String>>, description = "The array of the registers to get"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let registers = GDB_MANAGER.get_registers(&session_id, reg_list).await?;
     Ok(tool_text_content!(format!("Registers: {}", serde_json::to_string(&registers)?)))
 }
 
-#[tool(
-    name = "get_register_names",
-    description = "Get register names in the current GDB session",
-    params(
-        session_id = "The ID of the GDB session",
-        reg_list = "The array of the registers to get",
-    )
-)]
+#[tool(name = "get_register_names", description = "Get register names in the current GDB session")]
 pub async fn get_register_names_tool(
-    session_id: String,
-    reg_list: Option<Vec<String>>,
-) -> Result<ToolResponseContent> {
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+    reg_list: tool_param!(Option<Vec<String>>, description = "The array of the registers to get"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let registers = GDB_MANAGER.get_register_names(&session_id, reg_list).await?;
     Ok(tool_text_content!(format!("Registers: {}", serde_json::to_string(&registers)?)))
 }
@@ -240,53 +213,51 @@ pub async fn get_register_names_tool(
             begin: The start address of the memory block, as hexadecimal literal. \
             end: The end address of the memory block, as hexadecimal literal. \
             offset: The offset of the memory block, as hexadecimal literal, relative to the start address passed to -data-read-memory-bytes.\
-            contents: The contents of the memory block, in hex bytes.",
-    params(
-        session_id = "The ID of the GDB session",
-        address = "An expression specifying the address of the first addressable memory unit to be read. \
-            Complex expressions containing embedded white space should be quoted using the C convention.",
-        count = "The number of addressable memory units to read. This should be an integer literal.",
-        offset = "The offset relative to address at which to start reading. This should be an integer literal. \
-            This option is provided so that a frontend is not required to first evaluate address and \
-            then perform address arithmetic itself.",
-    )
+            contents: The contents of the memory block, in hex bytes."
 )]
 pub async fn read_memory_tool(
-    session_id: String,
-    address: String,
-    count: usize,
-    offset: Option<isize>,
-) -> Result<ToolResponseContent> {
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+    address: tool_param!(
+        String,
+        description = "An expression specifying the address of the first addressable memory unit to be read. \
+        Complex expressions containing embedded white space should be quoted using the C convention."
+    ),
+    count: tool_param!(
+        usize,
+        description =
+            "The number of addressable memory units to read. This should be an integer literal."
+    ),
+    offset: tool_param!(
+        Option<isize>,
+        description = "The offset relative to address at which to start reading. This should be an integer literal. \
+        This option is provided so that a frontend is not required to first evaluate address and \
+        then perform address arithmetic itself."
+    ),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let memory = GDB_MANAGER.read_memory(&session_id, offset, address, count).await?;
     Ok(tool_text_content!(format!("Memory: {}", serde_json::to_string(&memory)?)))
 }
 
-#[tool(
-    name = "continue_execution",
-    description = "Continue program execution",
-    params(session_id = "The ID of the GDB session")
-)]
-pub async fn continue_execution_tool(session_id: String) -> Result<ToolResponseContent> {
+#[tool(name = "continue_execution", description = "Continue program execution")]
+pub async fn continue_execution_tool(
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let ret = GDB_MANAGER.continue_execution(&session_id).await?;
     Ok(tool_text_content!(format!("Continued execution: {}", ret)))
 }
 
-#[tool(
-    name = "step_execution",
-    description = "Step into next line",
-    params(session_id = "The ID of the GDB session")
-)]
-pub async fn step_execution_tool(session_id: String) -> Result<ToolResponseContent> {
+#[tool(name = "step_execution", description = "Step into next line")]
+pub async fn step_execution_tool(
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let ret = GDB_MANAGER.step_execution(&session_id).await?;
     Ok(tool_text_content!(format!("Stepped into next line: {}", ret)))
 }
 
-#[tool(
-    name = "next_execution",
-    description = "Step over next line",
-    params(session_id = "The ID of the GDB session")
-)]
-pub async fn next_execution_tool(session_id: String) -> Result<ToolResponseContent> {
+#[tool(name = "next_execution", description = "Step over next line")]
+pub async fn next_execution_tool(
+    session_id: tool_param!(String, description = "The ID of the GDB session"),
+) -> Result<ToolResponseContent, anyhow::Error> {
     let ret = GDB_MANAGER.next_execution(&session_id).await?;
     Ok(tool_text_content!(format!("Stepped over next line: {}", ret)))
 }
