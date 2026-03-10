@@ -232,7 +232,7 @@ impl GDB {
                 command_token,
             )
             .await
-            .expect("write interpreter command");
+            .map_err(|e| AppError::GDBError(format!("Failed to write command: {}", e)))?;
 
         match self.result_output.recv().await {
             Some(record) => match record.token {
@@ -256,17 +256,27 @@ impl GDB {
         }
     }
 
-    pub async fn execute_later<C: std::borrow::Borrow<commands::MiCommand>>(&mut self, command: C) {
+    pub async fn execute_later<C: std::borrow::Borrow<commands::MiCommand>>(
+        &mut self,
+        command: C,
+    ) -> AppResult<()> {
         let command_token = self.new_token();
         command
             .borrow()
             .write_interpreter_string(
-                &mut self.process.lock().await.stdin.as_mut().unwrap(),
+                &mut self
+                    .process
+                    .lock()
+                    .await
+                    .stdin
+                    .as_mut()
+                    .ok_or_else(|| AppError::GDBError("Failed to get stdin".to_string()))?,
                 command_token,
             )
             .await
-            .expect("write interpreter command");
+            .map_err(|e| AppError::GDBError(format!("Failed to write command: {}", e)))?;
         let _ = self.result_output.recv().await;
+        Ok(())
     }
 
     pub async fn is_session_active(&mut self) -> AppResult<bool> {

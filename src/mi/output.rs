@@ -1,4 +1,3 @@
-// use std::io::{BufRead, BufReader, Read};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -274,7 +273,7 @@ fn string(input: &str) -> IResult<&str, String> {
 }
 
 fn to_map(v: Vec<(String, Value)>) -> Map<String, Value> {
-    Map::from_iter(v.into_iter())
+    Map::from_iter(v)
 }
 
 fn to_list(v: Vec<(String, Value)>) -> Vec<Value> {

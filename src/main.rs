@@ -278,29 +278,13 @@ async fn main() -> Result<(), AppError> {
 
     let server_protocol = register_tools(server_protocol).build();
 
-    let transport = match args.transport {
-        TransportType::Stdio => {
-            let transport =
-                Arc::new(ServerStdioTransport::new(server_protocol)) as Arc<dyn Transport>;
-            {
-                let mut transport_guard = TRANSPORT.lock().await;
-                *transport_guard = Some(transport.clone());
-            }
-            transport
-        }
+    let transport: Arc<dyn Transport> = match args.transport {
+        TransportType::Stdio => Arc::new(ServerStdioTransport::new(server_protocol)),
         TransportType::Sse => {
-            let transport = Arc::new(ServerSseTransport::new(
-                config.server_ip,
-                config.server_port,
-                server_protocol,
-            )) as Arc<dyn Transport>;
-            {
-                let mut transport_guard = TRANSPORT.lock().await;
-                *transport_guard = Some(transport.clone());
-            }
-            transport
+            Arc::new(ServerSseTransport::new(config.server_ip, config.server_port, server_protocol))
         }
     };
+    *TRANSPORT.lock().await = Some(transport.clone());
 
     // Start transport in a separate task
     let transport_clone = transport.clone();
