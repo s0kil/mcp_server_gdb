@@ -45,6 +45,10 @@ path = "src/main.rs"
 name = "gdb_client"
 path = "src/bin/gdb_client.rs"
 
+[dev-dependencies]
+tokio = { version = "1.50", features = ["full", "test-util"] }
+tempfile = "3"
+
 [profile.release]
 strip = "debuginfo"
 lto = "fat"

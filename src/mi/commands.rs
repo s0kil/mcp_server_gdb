@@ -17,6 +17,7 @@ pub struct MiCommand {
     pub parameters: Option<Vec<OsString>>,
 }
 
+#[allow(dead_code)]
 pub enum DisassembleMode {
     DisassemblyOnly = 0,
     DisassemblyWithRawOpcodes = 2,
@@ -71,6 +72,7 @@ impl fmt::Display for RegisterFormat {
     }
 }
 
+#[allow(dead_code)]
 pub enum BreakPointLocation<'a> {
     Address(usize),
     Function(&'a Path, &'a str),
@@ -217,7 +219,10 @@ impl MiCommand {
     pub fn data_evaluate_expression(expression: String) -> MiCommand {
         MiCommand {
             operation: "data-evaluate-expression",
-            options: Some(vec![OsString::from(format!("\"{}\"", expression))]), /* TODO: maybe we need to quote existing " in expression. Is this even possible? */
+            options: Some(vec![OsString::from(format!(
+                "\"{}\"",
+                expression.replace('\\', "\\\\").replace('"', "\\\"")
+            ))]),
             parameters: None,
         }
     }
@@ -528,6 +533,148 @@ impl MiCommand {
         options.push(address.into());
         options.push(count.to_string().into());
         MiCommand { operation: "data-read-memory-bytes", options: Some(options), parameters: None }
+    }
+
+    // --- New command builders for expanded tool coverage ---
+
+    pub fn exec_finish() -> MiCommand {
+        MiCommand { operation: "exec-finish", ..Default::default() }
+    }
+
+    pub fn exec_until(location: String) -> MiCommand {
+        MiCommand {
+            operation: "exec-until",
+            options: Some(vec![location.into()]),
+            parameters: None,
+        }
+    }
+
+    pub fn exec_return(expression: Option<String>) -> MiCommand {
+        MiCommand {
+            operation: "exec-return",
+            options: expression.map(|e| vec![e.into()]),
+            parameters: None,
+        }
+    }
+
+    pub fn exec_reverse_continue() -> MiCommand {
+        MiCommand {
+            operation: "exec-continue",
+            options: Some(vec!["--reverse".into()]),
+            parameters: None,
+        }
+    }
+
+    pub fn exec_reverse_step() -> MiCommand {
+        MiCommand {
+            operation: "exec-step",
+            options: Some(vec!["--reverse".into()]),
+            parameters: None,
+        }
+    }
+
+    pub fn exec_reverse_next() -> MiCommand {
+        MiCommand {
+            operation: "exec-next",
+            options: Some(vec!["--reverse".into()]),
+            parameters: None,
+        }
+    }
+
+    pub fn exec_reverse_finish() -> MiCommand {
+        MiCommand {
+            operation: "exec-finish",
+            options: Some(vec!["--reverse".into()]),
+            parameters: None,
+        }
+    }
+
+    pub fn insert_breakpoint_conditional(
+        location: BreakPointLocation,
+        condition: String,
+    ) -> MiCommand {
+        let mut cmd = Self::insert_breakpoint(location);
+        if let Some(ref mut opts) = cmd.options {
+            opts.insert(0, OsString::from(format!("\"{}\"", condition)));
+            opts.insert(0, OsString::from("-c"));
+        }
+        cmd
+    }
+
+    pub fn insert_breakpoint_temporary(location: BreakPointLocation) -> MiCommand {
+        let mut cmd = Self::insert_breakpoint(location);
+        if let Some(ref mut opts) = cmd.options {
+            opts.insert(0, OsString::from("-t"));
+        }
+        cmd
+    }
+
+    pub fn break_enable(breakpoint_numbers: Vec<BreakPointNumber>) -> MiCommand {
+        MiCommand {
+            operation: "break-enable",
+            options: Some(breakpoint_numbers.iter().map(|n| n.to_string().into()).collect()),
+            parameters: None,
+        }
+    }
+
+    pub fn break_disable(breakpoint_numbers: Vec<BreakPointNumber>) -> MiCommand {
+        MiCommand {
+            operation: "break-disable",
+            options: Some(breakpoint_numbers.iter().map(|n| n.to_string().into()).collect()),
+            parameters: None,
+        }
+    }
+
+    pub fn data_write_memory_bytes(
+        address: String,
+        contents: String,
+        count: Option<usize>,
+    ) -> MiCommand {
+        let mut options: Vec<OsString> = vec![address.into(), contents.into()];
+        if let Some(count) = count {
+            options.push(count.to_string().into());
+        }
+        MiCommand { operation: "data-write-memory-bytes", options: Some(options), parameters: None }
+    }
+
+    pub fn file_list_exec_source_files() -> MiCommand {
+        MiCommand { operation: "file-list-exec-source-files", ..Default::default() }
+    }
+
+    pub fn file_list_exec_source_file() -> MiCommand {
+        MiCommand { operation: "file-list-exec-source-file", ..Default::default() }
+    }
+
+    pub fn target_select(target_type: &str, parameters: &str) -> MiCommand {
+        MiCommand {
+            operation: "target-select",
+            options: Some(vec![target_type.into(), parameters.into()]),
+            parameters: None,
+        }
+    }
+
+    pub fn target_detach(pid: Option<u32>) -> MiCommand {
+        MiCommand {
+            operation: "target-detach",
+            options: pid.map(|p| vec![p.to_string().into()]),
+            parameters: None,
+        }
+    }
+
+    pub fn exec_signal(signal: &str) -> MiCommand {
+        MiCommand { operation: "exec-signal", options: Some(vec![signal.into()]), parameters: None }
+    }
+
+    pub fn gdb_set(variable: &str, value: &str) -> MiCommand {
+        MiCommand {
+            operation: "gdb-set",
+            options: Some(vec![variable.into(), value.into()]),
+            parameters: None,
+        }
+    }
+
+    pub fn gdb_show(variable: &str) -> MiCommand {
+        MiCommand { operation: "gdb-show", options: Some(vec![variable.into()]), parameters: None }
     }
 
     /// Empty command, used for testing purposes
