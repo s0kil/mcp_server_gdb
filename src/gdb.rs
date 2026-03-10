@@ -418,7 +418,7 @@ impl GDBManager {
                 r.name = names.get(r.number).cloned();
                 r
             })
-            .collect::<_>())
+            .collect())
     }
 
     /// Get register names (returns Vec<String> of register names indexed by number)
@@ -937,7 +937,7 @@ impl GDBManager {
 
     /// Send a signal to the debugged program
     pub async fn send_signal(&self, session_id: &str, signal: String) -> AppResult<String> {
-        let command = MiCommand::exec_signal(&signal);
+        let command = MiCommand::cli_exec(&format!("signal {signal}"));
         let response = self.send_command_with_timeout(session_id, &command, None).await?;
         Ok(response.results.to_string())
     }

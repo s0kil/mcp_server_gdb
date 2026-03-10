@@ -136,7 +136,6 @@ impl MiCommand {
         sink: &mut S,
         token: u64,
     ) -> Result<(), Error> {
-        // use std::os::unix::ffi::OsStrExt;
         let mut command = OsString::new();
         if !self.operation.is_empty() {
             command.push(format!("{}-{}", token, self.operation));
@@ -659,10 +658,6 @@ impl MiCommand {
             options: pid.map(|p| vec![p.to_string().into()]),
             parameters: None,
         }
-    }
-
-    pub fn exec_signal(signal: &str) -> MiCommand {
-        MiCommand { operation: "exec-signal", options: Some(vec![signal.into()]), parameters: None }
     }
 
     pub fn gdb_set(variable: &str, value: &str) -> MiCommand {
