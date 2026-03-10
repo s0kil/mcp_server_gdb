@@ -45,10 +45,6 @@ path = "src/main.rs"
 name = "gdb_client"
 path = "src/bin/gdb_client.rs"
 
-[[bin]]
-name = "test_app"
-path = "src/bin/test_app.rs"
-
 [profile.release]
 strip = "debuginfo"
 lto = "fat"
