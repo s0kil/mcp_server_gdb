@@ -16,7 +16,10 @@ impl Default for Config {
             server_port: std::env::var("SERVER_PORT")
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
-                .expect("Invalid server port"),
+                .unwrap_or_else(|e| {
+                    tracing::warn!("Invalid SERVER_PORT: {}, defaulting to 8080", e);
+                    8080
+                }),
             command_timeout: std::env::var("GDB_COMMAND_TIMEOUT")
                 .ok()
                 .and_then(|v| v.parse().ok())

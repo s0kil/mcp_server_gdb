@@ -17,7 +17,7 @@ use tracing::debug;
 
 use crate::error::{AppError, AppResult};
 
-#[allow(clippy::upper_case_acronyms)]
+#[allow(clippy::upper_case_acronyms, dead_code)]
 pub struct GDB {
     pub process: Arc<Mutex<Child>>,
     is_running: Arc<AtomicBool>,
@@ -25,12 +25,6 @@ pub struct GDB {
     current_command_token: AtomicU64,
     binary_path: PathBuf,
     init_options: Vec<OsString>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ExecuteError {
-    Busy,
-    Quit,
 }
 
 /// A builder struct for configuring and launching GDB with various command line
@@ -67,6 +61,7 @@ pub struct GDBBuilder {
     pub opt_tty: Option<PathBuf>,
 }
 
+#[allow(dead_code)]
 impl GDBBuilder {
     pub fn new(gdb: PathBuf) -> Self {
         GDBBuilder {
@@ -161,7 +156,12 @@ impl GDBBuilder {
             .spawn()
             .map_err(|e| AppError::GDBError(format!("Failed to start GDB process: {}", e)))?;
 
-        let stdout = BufReader::new(child.stdout.take().unwrap());
+        let stdout = BufReader::new(
+            child
+                .stdout
+                .take()
+                .ok_or_else(|| AppError::GDBError("Failed to capture GDB stdout".to_string()))?,
+        );
         let is_running = Arc::new(AtomicBool::new(false));
         let is_running_clone = is_running.clone();
         let (result_input, result_output) = mpsc::channel(100);
@@ -179,6 +179,7 @@ impl GDBBuilder {
     }
 }
 
+#[allow(dead_code)]
 impl GDB {
     #[cfg(unix)]
     pub async fn interrupt_execution(&self) -> Result<(), nix::Error> {
@@ -251,7 +252,7 @@ impl GDB {
                     command_token
                 ))),
             },
-            None => Err(AppError::GDBError("no result, expecting {}".to_string())),
+            None => Err(AppError::GDBError(format!("no result, expecting {}", command_token))),
         }
     }
 

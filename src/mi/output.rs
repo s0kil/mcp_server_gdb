@@ -73,6 +73,7 @@ pub struct ResultRecord {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum OutOfBandRecord {
     AsyncRecord { token: Option<u64>, kind: AsyncKind, class: AsyncClass, results: Value },
     StreamRecord { kind: StreamKind, data: String },
@@ -124,7 +125,9 @@ pub async fn process_output<T: AsyncRead + Unpin>(
                             ResultClass::Error => is_running.store(false, Ordering::SeqCst),
                             _ => {}
                         }
-                        result_pipe.send(record).await.expect("send result to pipe");
+                        if result_pipe.send(record).await.is_err() {
+                            break;
+                        }
                     }
                     Output::OutOfBand(record) => {
                         if let OutOfBandRecord::AsyncRecord { class: AsyncClass::Stopped, .. } =
@@ -132,26 +135,29 @@ pub async fn process_output<T: AsyncRead + Unpin>(
                         {
                             is_running.store(false, Ordering::SeqCst);
                         }
-                        out_of_band_pipe
-                            .send(record)
-                            .await
-                            .expect("send out of band record to pipe");
+                        if out_of_band_pipe.send(record).await.is_err() {
+                            break;
+                        }
                     }
                     Output::GDBLine => {}
                     //Output::SomethingElse(_) => { /*println!("SOMETHING ELSE: {}", str);*/ }
                     Output::SomethingElse(text) => {
-                        out_of_band_pipe
+                        if out_of_band_pipe
                             .send(OutOfBandRecord::StreamRecord {
                                 kind: StreamKind::Target,
                                 data: text,
                             })
                             .await
-                            .expect("send out of band record to pipe");
+                            .is_err()
+                        {
+                            break;
+                        }
                     }
                 }
             }
             Err(e) => {
-                panic!("{}", e);
+                tracing::error!("GDB stdout read error: {}", e);
+                break;
             }
         }
     }
